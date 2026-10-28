@@ -1,0 +1,10 @@
+{
+  "name": "Heroic Library",
+  "author": "Filipe Constantinov Menezes",
+  "flags": ["debug"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["heroic", "games", "library", "gog", "epic"],
+    "description": "Browse and launch your Heroic Games Launcher library (GOG + Epic) from the Quick Access menu."
+  }
+}

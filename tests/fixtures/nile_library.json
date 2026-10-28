@@ -1,0 +1,27 @@
+{
+  "library": [
+    {
+      "title": "Deep Sky Derelicts",
+      "app_name": "amzn1.adg.product.9f8a01b5",
+      "runner": "nile",
+      "is_installed": false,
+      "art_square": "https://m.media-amazon.com/dsd.jpg",
+      "art_cover": "https://m.media-amazon.com/dsd_cover.jpg",
+      "install": {},
+      "cloud_save_enabled": false,
+      "developer": "Snowhound Games"
+    },
+    {
+      "title": "Close to the Sun",
+      "app_name": "amzn1.adg.product.ctts",
+      "runner": "nile",
+      "is_installed": true,
+      "art_square": "https://m.media-amazon.com/ctts.jpg",
+      "install": {
+        "install_size": "14.1 GiB",
+        "install_path": "/home/steamuser/Games/Heroic/CloseToTheSun"
+      },
+      "cloud_save_enabled": true
+    }
+  ]
+}

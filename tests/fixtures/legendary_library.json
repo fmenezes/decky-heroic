@@ -1,0 +1,39 @@
+{
+  "library": [
+    {
+      "title": "Hogwarts Legacy",
+      "app_name": "fa4240e57a3c46b39f169041b7811293",
+      "runner": "legendary",
+      "is_installed": true,
+      "art_square": "https://cdn1.epicgames.com/hl_tall.jpg",
+      "art_cover": "https://cdn1.epicgames.com/hl_wide.jpg",
+      "install": {
+        "executable": "HogwartsLegacy.exe",
+        "install_path": "/home/steamuser/Games/Heroic/HogwartsLegacy",
+        "install_size": "71.2 GiB",
+        "is_dlc": false,
+        "platform": "Windows"
+      },
+      "cloud_save_enabled": true,
+      "developer": "Warner Bros."
+    },
+    {
+      "title": "Mechabellum",
+      "app_name": "a477f73fc8b54e09ba7a35f9579797cb",
+      "runner": "legendary",
+      "is_installed": false,
+      "art_square": "https://cdn1.epicgames.com/mecha_tall.jpg",
+      "install": { "is_dlc": false },
+      "cloud_save_enabled": false
+    },
+    {
+      "title": "Citizen Sleeper",
+      "app_name": "308461dd5d8248058a65a2667f92e330",
+      "runner": "legendary",
+      "is_installed": false,
+      "art_square": "",
+      "install": { "is_dlc": false },
+      "cloud_save_enabled": false
+    }
+  ]
+}

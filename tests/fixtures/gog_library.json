@@ -1,0 +1,37 @@
+{
+  "games": [
+    {
+      "title": "Galaxy Common Redistributables",
+      "app_name": "gog-redist",
+      "runner": "gog",
+      "is_installed": false,
+      "art_square": "https://images.gog.com/redist.jpg",
+      "install": { "is_dlc": false },
+      "cloud_save_enabled": false
+    },
+    {
+      "title": "Mafia II: Definitive Edition",
+      "app_name": "1449710114",
+      "runner": "gog",
+      "is_installed": false,
+      "art_square": "https://images.gog.com/mafia2.jpg",
+      "art_cover": "https://images.gog.com/mafia2_cover.jpg",
+      "install": { "is_dlc": false },
+      "cloud_save_enabled": false,
+      "developer": "D3T Limited"
+    },
+    {
+      "title": "Rebel Galaxy",
+      "app_name": "1435582019",
+      "runner": "gog",
+      "is_installed": true,
+      "art_square": "https://images.gog.com/rebel.jpg",
+      "install": {
+        "is_dlc": false,
+        "install_size": "2.5 GiB",
+        "install_path": "/home/steamuser/Games/Heroic/RebelGalaxy"
+      },
+      "cloud_save_enabled": true
+    }
+  ]
+}
