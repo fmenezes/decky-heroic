@@ -5,13 +5,23 @@ import type { GameEntry } from "../types";
 interface Props {
   game: GameEntry;
   onSelect: (game: GameEntry) => void;
+  width?: number;
+  height?: number;
 }
 
-// Steam native library grid specs: 134x201 card (2:3 aspect ratio, 5-col layout)
-const CARD_WIDTH = 134;
-const CARD_HEIGHT = 201;
+// Steam native library grid specs:
+// Small (<=853px): 110x165
+// Medium (handheld): 134x201 (2:3 aspect ratio, 5-col layout)
+// Large (docked/high-res): 172x258 (2:3 aspect ratio, 7-col layout)
+const DEFAULT_CARD_WIDTH = 134;
+const DEFAULT_CARD_HEIGHT = 201;
 
-export const GameCard = ({ game, onSelect }: Props) => {
+export const GameCard = ({
+  game,
+  onSelect,
+  width = DEFAULT_CARD_WIDTH,
+  height = DEFAULT_CARD_HEIGHT,
+}: Props) => {
   const [focused, setFocused] = useState(false);
 
   return (
@@ -23,8 +33,8 @@ export const GameCard = ({ game, onSelect }: Props) => {
       onMouseEnter={() => setFocused(true)}
       onMouseLeave={() => setFocused(false)}
       style={{
-        width: `${CARD_WIDTH}px`,
-        height: `${CARD_HEIGHT}px`,
+        width: `${width}px`,
+        height: `${height}px`,
         position: "relative",
         cursor: "pointer",
         flexShrink: 0,
@@ -45,8 +55,8 @@ export const GameCard = ({ game, onSelect }: Props) => {
           alt={game.title}
           title={game.title}
           style={{
-            width: `${CARD_WIDTH}px`,
-            height: `${CARD_HEIGHT}px`,
+            width: `${width}px`,
+            height: `${height}px`,
             objectFit: "cover",
             borderRadius: "4px",
             display: "block",
@@ -57,14 +67,14 @@ export const GameCard = ({ game, onSelect }: Props) => {
       ) : (
         <div
           style={{
-            width: `${CARD_WIDTH}px`,
-            height: `${CARD_HEIGHT}px`,
+            width: `${width}px`,
+            height: `${height}px`,
             borderRadius: "4px",
             background: "#2a2a2a",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "14px",
+            fontSize: width > 150 ? "16px" : width < 120 ? "12px" : "14px",
             padding: "12px",
             textAlign: "center",
             pointerEvents: "none",

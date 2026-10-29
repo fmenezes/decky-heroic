@@ -1,5 +1,5 @@
 import { Focusable, Navigation } from "@decky/ui";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { GameCard } from "./GameCard";
 import { ensureSteamShortcut, getLibrary, updateStoreCounts } from "../lib/heroic";
 import { toaster } from "@decky/api";
@@ -19,16 +19,72 @@ const STORE_NAMES: Record<string, string> = {
 
 const storeName = (store: string) => STORE_NAMES[store] ?? store;
 
-// Steam native library grid specs: 134x201 card (5-column layout matching Steam handheld view)
-const CARD_WIDTH = 134;
-const CARD_HEIGHT = 201;
+// Steam native library grid specs (reverse-engineered from Valve sp.js):
+// GamepadUIBreakNarrow: 853px, GamepadUIBreakWide: 1280px, GamepadUIBreakShort: 500px
+// GamepadPortraitWidthSmall: 110px, Medium: 134px, Large: 172px
 const CARD_COL_GAP = 16;
 const CARD_ROW_GAP = 42;
+
+export interface CardDimensions {
+  width: number;
+  height: number;
+}
+
+const calculateSteamCardSize = (el: HTMLElement | null): CardDimensions => {
+  if (!el) return { width: 134, height: 201 };
+  const win = el.ownerDocument?.defaultView;
+  const winWidth = win ? win.innerWidth : 0;
+  const winHeight = win ? win.innerHeight : 0;
+  const containerWidth = el.getBoundingClientRect().width;
+
+  // Decky runs in background SharedJSContext (1x1 window), so we read the actual
+  // Big Picture Mode display window from the DOM element, falling back to container width.
+  const effectiveWidth = winWidth > 1 ? winWidth : containerWidth;
+  const effectiveHeight = winHeight > 1 ? winHeight : el.getBoundingClientRect().height;
+
+  if (effectiveWidth <= 853 || (effectiveHeight > 1 && effectiveHeight <= 500)) {
+    return { width: 110, height: 165 };
+  }
+  if (effectiveWidth >= 1280) {
+    return { width: 172, height: 258 };
+  }
+  return { width: 134, height: 201 };
+};
 
 export const StoreLibraryTab = ({ store }: Props) => {
   const [games, setGames] = useState<GameEntry[]>([]);
   const [errors, setErrors] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [cardSize, setCardSize] = useState<CardDimensions>({ width: 134, height: 201 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      setCardSize(calculateSteamCardSize(el));
+    };
+
+    update();
+
+    const ro = new ResizeObserver(() => {
+      update();
+    });
+    ro.observe(el);
+
+    const win = el.ownerDocument?.defaultView;
+    if (win) {
+      win.addEventListener("resize", update);
+    }
+
+    return () => {
+      ro.disconnect();
+      if (win) {
+        win.removeEventListener("resize", update);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +128,7 @@ export const StoreLibraryTab = ({ store }: Props) => {
 
   return (
     <Focusable
+      ref={containerRef}
       flow-children="column"
       style={{
         width: "100%",
@@ -103,8 +160,8 @@ export const StoreLibraryTab = ({ store }: Props) => {
           flow-children="grid"
           style={{
             display: "grid",
-            gridTemplateColumns: `repeat(auto-fill, ${CARD_WIDTH}px)`,
-            gridAutoRows: `${CARD_HEIGHT}px`,
+            gridTemplateColumns: `repeat(auto-fill, ${cardSize.width}px)`,
+            gridAutoRows: `${cardSize.height}px`,
             columnGap: `${CARD_COL_GAP}px`,
             rowGap: `${CARD_ROW_GAP}px`,
             justifyContent: "space-between",
@@ -114,7 +171,13 @@ export const StoreLibraryTab = ({ store }: Props) => {
           }}
         >
           {games.map((g) => (
-            <GameCard key={g.app_name} game={g} onSelect={onSelect} />
+            <GameCard
+              key={g.app_name}
+              game={g}
+              onSelect={onSelect}
+              width={cardSize.width}
+              height={cardSize.height}
+            />
           ))}
         </Focusable>
       )}
