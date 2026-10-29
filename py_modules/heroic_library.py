@@ -29,7 +29,7 @@ STORE_TO_RUNNER = {
 # Non-game entries to hide.
 SKIPPED_APP_NAMES = {"gog-redist"}
 
-# Candidate Heroic config dirs, in probe order (after any custom path).
+# Candidate Heroic config dirs, in probe order.
 FLATPAK_CONFIG_PATH = Path(
     "~/.var/app/com.heroicgameslauncher.hgl/config/heroic"
 ).expanduser()
@@ -38,23 +38,18 @@ DEFAULT_CONFIG_CANDIDATES = [FLATPAK_CONFIG_PATH, NATIVE_CONFIG_PATH]
 
 
 def find_heroic_config(
-    custom_path: str | None = None,
     candidates: list[Path] | None = None,
 ) -> Path | None:
     """Locate a Heroic config directory.
 
-    Probes, in order: ``custom_path`` (if given), then ``candidates``
-    (defaults to the flatpak config dir followed by the native install one).
-    A candidate counts only if it contains a ``store_cache`` directory.
-    Returns ``None`` when no Heroic installation is found.
+    Probes ``candidates`` (defaults to the flatpak config dir followed by
+    the native install one). A candidate counts only if it contains a
+    ``store_cache`` directory. Returns ``None`` when no Heroic installation
+    is found.
     """
     if candidates is None:
         candidates = DEFAULT_CONFIG_CANDIDATES
-    ordered: list[Path] = []
-    if custom_path:
-        ordered.append(Path(custom_path).expanduser())
-    ordered.extend(candidates)
-    for path in ordered:
+    for path in candidates:
         if (path / "store_cache").is_dir():
             return path
     return None
@@ -131,6 +126,40 @@ def get_library(heroic_config_dir: Path) -> dict[str, Any]:
     games.extend(parse_sideloads(heroic_config_dir / "sideload_apps"))
     games.sort(key=lambda g: (not g["is_installed"], g["title"].casefold()))
     return {"games": games, "errors": errors}
+
+
+def is_store_logged_in(heroic_config_dir: Path | None, store: str) -> bool:
+    """Check whether a store has been logged in / initialized in Heroic.
+
+    Sideload does not require authentication and is always considered logged in.
+    Other stores check for their respective library cache file or auth credentials.
+    """
+    if store == "sideload":
+        return True
+    if heroic_config_dir is None:
+        return False
+
+    store_cache = heroic_config_dir / "store_cache"
+    if store == "gog":
+        return (
+            (store_cache / "gog_library.json").is_file()
+            or (heroic_config_dir / "gog_store" / "auth.json").is_file()
+        )
+    if store == "epic":
+        home = Path.home()
+        return (
+            (store_cache / "legendary_library.json").is_file()
+            or (heroic_config_dir / "legendaryConfig" / "legendary" / "user.json").is_file()
+            or (home / ".config" / "legendary" / "user.json").is_file()
+        )
+    if store == "amazon":
+        home = Path.home()
+        return (
+            (store_cache / "nile_library.json").is_file()
+            or (heroic_config_dir / "nile_config" / "nile" / "credentials.json").is_file()
+            or (home / ".config" / "nile" / "credentials.json").is_file()
+        )
+    return False
 
 
 def launch_url(app_name: str, runner: str) -> str:

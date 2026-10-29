@@ -1,22 +1,40 @@
 import { callable } from "@decky/api";
 import { Navigation } from "@decky/ui";
-import type { GameEntry, LibraryResult, Store } from "../types";
+import type { GameEntry, LibraryResult, Store, StoresStatus } from "../types";
 
-export type { GameEntry, LibraryResult, Store };
+export type { GameEntry, LibraryResult, Store, StoresStatus };
 
 export const getLibrary = callable<[], LibraryResult>("get_library");
 
 export interface HeroicStatus {
-  /** False once the backend has confirmed Heroic is not installed. Starts
+  /** False once the backend has confirmed Heroic is not installed or configured. Starts
    * optimistic (true) so tabs are not needlessly withheld at load. */
   found: boolean;
-  /** Config paths probed during detection (shown in the settings warning). */
+  /** Whether Heroic flatpak or native binary is installed on the system. */
+  installed: boolean;
+  /** Whether flatpak is available on this system. */
+  hasFlatpak: boolean;
+  /** Stores login status (true if configured/logged in). */
+  stores: StoresStatus;
+  /** Config paths probed during detection. */
   probed: string[];
   /** True until the first backend check has completed. */
   checked: boolean;
 }
 
-let heroicStatus: HeroicStatus = { found: true, probed: [], checked: false };
+let heroicStatus: HeroicStatus = {
+  found: false,
+  installed: false,
+  hasFlatpak: false,
+  stores: {
+    gog: false,
+    epic: false,
+    amazon: false,
+    sideload: false,
+  },
+  probed: [],
+  checked: false,
+};
 const statusSubs = new Set<() => void>();
 
 export function getHeroicStatus(): HeroicStatus {
@@ -37,16 +55,48 @@ function setHeroicStatus(next: HeroicStatus): void {
 
 const checkHeroic = callable<
   [],
-  { found: boolean; probed?: string[] }
+  {
+    found: boolean;
+    installed?: boolean;
+    has_flatpak?: boolean;
+    stores?: Partial<StoresStatus>;
+    probed?: string[];
+  }
 >("check_heroic");
 
-/** Re-run Heroic detection (e.g. after the user sets a custom config path)
- * and notify subscribers. Never throws. */
+export interface InstallProgress {
+  status: "idle" | "running" | "success" | "error";
+  logs: string[];
+  error?: string | null;
+}
+
+export const startInstallHeroic = callable<[], InstallProgress>(
+  "start_install_heroic",
+);
+
+export const getInstallProgress = callable<[], InstallProgress>(
+  "get_install_progress",
+);
+
+export const installHeroic = callable<
+  [],
+  { success: boolean; error?: string }
+>("install_heroic");
+
+/** Re-run Heroic detection and notify subscribers. Never throws. */
 export async function refreshHeroicStatus(): Promise<void> {
   try {
     const res = await checkHeroic();
     setHeroicStatus({
-      found: res.found,
+      found: Boolean(res.found),
+      installed: res.installed !== undefined ? Boolean(res.installed) : Boolean(res.found),
+      hasFlatpak: Boolean(res.has_flatpak),
+      stores: {
+        gog: Boolean(res.stores?.gog),
+        epic: Boolean(res.stores?.epic),
+        amazon: Boolean(res.stores?.amazon),
+        sideload: Boolean(res.stores?.sideload),
+      },
       probed: res.probed ?? [],
       checked: true,
     });
@@ -292,12 +342,21 @@ export function subscribeStoreCounts(fn: () => void): () => void {
 export async function primeLibrary(): Promise<void> {
   try {
     const res = await getLibrary();
-    if (res.heroic_found !== undefined) {
+    if (res.installed !== undefined || res.heroic_found !== undefined) {
       setHeroicStatus({
-        found: res.heroic_found,
+        found: Boolean(res.heroic_found),
+        installed: Boolean(res.installed),
+        hasFlatpak: heroicStatus.hasFlatpak,
+        stores: {
+          gog: Boolean(res.stores?.gog),
+          epic: Boolean(res.stores?.epic),
+          amazon: Boolean(res.stores?.amazon),
+          sideload: Boolean(res.stores?.sideload),
+        },
         probed: res.probed ?? [],
         checked: true,
       });
+      void refreshHeroicStatus();
     } else {
       void refreshHeroicStatus();
     }

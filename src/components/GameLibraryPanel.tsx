@@ -1,14 +1,18 @@
 import {
   ButtonItem,
+  Field,
   PanelSection,
   PanelSectionRow,
-  TextField,
   ToggleField,
+  showModal,
 } from "@decky/ui";
+import { toaster } from "@decky/api";
 import { useEffect, useState } from "react";
+import { InstallModal } from "./InstallModal";
 import {
   getHeroicStatus,
   openHeroicLauncher,
+  primeLibrary,
   refreshHeroicStatus,
   subscribeHeroicStatus,
 } from "../lib/heroic";
@@ -18,78 +22,193 @@ import {
   updateSetting,
   type PluginSettings,
 } from "../lib/settings";
+import { requestLibraryRerender } from "../patches/LibraryPatch";
 
 export const GameLibraryPanel = () => {
   const [settings, setSettings] = useState<PluginSettings>(getSettingsSync());
   const [heroicStatus, setHeroicStatus] = useState(getHeroicStatus());
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const unsub = subscribeSettings(setSettings);
     const unsubStatus = subscribeHeroicStatus(() =>
       setHeroicStatus(getHeroicStatus()),
     );
+    void refreshHeroicStatus();
     return () => {
       unsub();
       unsubStatus();
     };
   }, []);
 
-  const onConfigPath = (e: React.ChangeEvent<HTMLInputElement>) => {
-    void updateSetting("configPath", e.target.value).then(() =>
-      refreshHeroicStatus(),
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshHeroicStatus();
+      await primeLibrary();
+      requestLibraryRerender();
+      toaster.toast({
+        title: "Heroic Library",
+        body: "Library and accounts refreshed",
+      });
+    } catch (e: any) {
+      toaster.toast({
+        title: "Heroic Library",
+        body: `Refresh failed: ${e?.message || e}`,
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleOpenInstallModal = () => {
+    let modalHandle: { Close: () => void } | undefined;
+    modalHandle = showModal(
+      <InstallModal
+        closeModal={() => modalHandle?.Close()}
+        onSuccess={() => void refreshHeroicStatus()}
+      />,
     );
   };
 
-  return (
-    <PanelSection title="Heroic Library">
-      {!heroicStatus.found && (
+  // State 1: Heroic is not installed -> show only install button
+  if (!heroicStatus.installed) {
+    return (
+      <PanelSection title="Heroic Library">
         <PanelSectionRow>
           <div
             style={{
               color: "#e0654b",
               fontSize: "13px",
               fontWeight: "bold",
+              marginBottom: "4px",
             }}
           >
-            Heroic not found
+            Heroic is not installed
           </div>
-          <div style={{ color: "#e0654b", fontSize: "12px" }}>
-            Looked in: {heroicStatus.probed.join("; ") || "nowhere"}. Set the
-            config folder below to point the plugin at your Heroic install.
+          <div
+            style={{
+              color: "#d0d0d0",
+              fontSize: "12px",
+              marginBottom: "8px",
+            }}
+          >
+            Heroic Games Launcher is required to sync and launch games from Epic
+            Games, GOG, and Amazon Prime.
           </div>
+          {heroicStatus.hasFlatpak ? (
+            <ButtonItem
+              layout="below"
+              bottomSeparator="none"
+              onClick={handleOpenInstallModal}
+            >
+              Install Heroic (Flatpak)
+            </ButtonItem>
+          ) : (
+            <div style={{ color: "#e0654b", fontSize: "12px" }}>
+              Flatpak is not available on this system. Please install Heroic
+              Games Launcher manually.
+            </div>
+          )}
         </PanelSectionRow>
-      )}
+      </PanelSection>
+    );
+  }
+
+  // State 2: Heroic is installed -> show open button and tab controls
+  return (
+    <PanelSection title="Heroic Library">
+      <PanelSectionRow>
+        <ButtonItem
+          layout="below"
+          bottomSeparator="none"
+          onClick={() => void openHeroicLauncher().catch(console.error)}
+        >
+          Open Heroic Games Launcher
+        </ButtonItem>
+      </PanelSectionRow>
+
+      <PanelSectionRow>
+        <ButtonItem
+          layout="below"
+          bottomSeparator="standard"
+          disabled={refreshing}
+          onClick={() => void handleRefresh()}
+        >
+          {refreshing ? "Refreshing…" : "Refresh Library & Accounts"}
+        </ButtonItem>
+      </PanelSectionRow>
+
       <PanelSectionRow>
         <div style={{ opacity: "0.6", fontSize: "12px" }}>
-          GOG, Epic, Amazon and Sideloaded games appear as tabs in the Steam
-          library. Opening a game from there registers it as a native Steam
-          shortcut.
+          Active store libraries appear as tabs in the Steam library. Opening a
+          game registers it as a native Steam shortcut.
         </div>
       </PanelSectionRow>
+
       <PanelSectionRow>
-        <ToggleField
-          label="GOG library tab"
-          description="Show GOG games as a tab in the Steam library"
-          checked={settings.gogTab}
-          onChange={(v) => void updateSetting("gogTab", v)}
-        />
+        {heroicStatus.stores.gog ? (
+          <ToggleField
+            label="GOG library tab"
+            description="Show GOG games as a tab in the Steam library"
+            checked={settings.gogTab}
+            onChange={(v) => void updateSetting("gogTab", v)}
+          />
+        ) : (
+          <Field
+            label="GOG library tab"
+            description={
+              <span style={{ color: "#f5a623" }}>
+                Not logged in — sign in via Heroic first
+              </span>
+            }
+            disabled
+          />
+        )}
       </PanelSectionRow>
+
       <PanelSectionRow>
-        <ToggleField
-          label="Epic library tab"
-          description="Show Epic games as a tab in the Steam library"
-          checked={settings.epicTab}
-          onChange={(v) => void updateSetting("epicTab", v)}
-        />
+        {heroicStatus.stores.epic ? (
+          <ToggleField
+            label="Epic library tab"
+            description="Show Epic games as a tab in the Steam library"
+            checked={settings.epicTab}
+            onChange={(v) => void updateSetting("epicTab", v)}
+          />
+        ) : (
+          <Field
+            label="Epic library tab"
+            description={
+              <span style={{ color: "#f5a623" }}>
+                Not logged in — sign in via Heroic first
+              </span>
+            }
+            disabled
+          />
+        )}
       </PanelSectionRow>
+
       <PanelSectionRow>
-        <ToggleField
-          label="Amazon library tab"
-          description="Show Amazon games as a tab in the Steam library"
-          checked={settings.amazonTab}
-          onChange={(v) => void updateSetting("amazonTab", v)}
-        />
+        {heroicStatus.stores.amazon ? (
+          <ToggleField
+            label="Amazon library tab"
+            description="Show Amazon games as a tab in the Steam library"
+            checked={settings.amazonTab}
+            onChange={(v) => void updateSetting("amazonTab", v)}
+          />
+        ) : (
+          <Field
+            label="Amazon library tab"
+            description={
+              <span style={{ color: "#f5a623" }}>
+                Not logged in — sign in via Heroic first
+              </span>
+            }
+            disabled
+          />
+        )}
       </PanelSectionRow>
+
       <PanelSectionRow>
         <ToggleField
           label="Sideloaded library tab"
@@ -97,23 +216,6 @@ export const GameLibraryPanel = () => {
           checked={settings.sideloadTab}
           onChange={(v) => void updateSetting("sideloadTab", v)}
         />
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <TextField
-          label="Heroic config folder"
-          description="Only needed if auto-detection fails (e.g. a non-standard install location)"
-          value={settings.configPath}
-          onChange={onConfigPath}
-        />
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <ButtonItem
-          layout="below"
-          bottomSeparator="none"
-          onClick={() => void openHeroicLauncher().catch(console.error)}
-        >
-          Heroic Games Launcher
-        </ButtonItem>
       </PanelSectionRow>
     </PanelSection>
   );

@@ -131,34 +131,34 @@ export function patchLibrary(): void {
                   : {};
 
                 const settings = getSettingsSync();
-                // while Heroic is undetected the tabs would be empty noise —
-                // hide them (they return once detection succeeds and the
-                // status subscriber triggers a library rerender)
-                const customTabs: SteamTab[] = getHeroicStatus().found
-                  ? STORE_TABS.filter((def) => settings[def.setting]).map(
-                      (def) => ({
-                        title: def.title,
-                        id: def.id,
-                        footer: templateFooter,
-                        content: wrap(
-                          <StoreLibraryTab store={def.store} />,
-                          def.title,
-                        ),
-                        renderTabAddon: () => {
-                          const count = getStoreCount(def.store);
-                          // like Steam's native tabs, always show the count (0
-                          // included) so empty stores still read consistently
-                          return (
-                            <span
-                              className={gamepadTabbedPageClasses.TabCount}
-                            >
-                              {count}
-                            </span>
-                          );
-                        },
-                      }),
-                    )
-                  : [];
+                const status = getHeroicStatus();
+                // A tab is displayed if and only if: installed && logged && enabled
+                const customTabs: SteamTab[] = STORE_TABS.filter((def) => {
+                  const isInstalled = Boolean(status.installed);
+                  const isLogged = Boolean(status.stores?.[def.store]);
+                  const isEnabled = Boolean(settings[def.setting]);
+                  return isInstalled && isLogged && isEnabled;
+                }).map((def) => ({
+                  title: def.title,
+                  id: def.id,
+                  footer: templateFooter,
+                  content: wrap(
+                    <StoreLibraryTab store={def.store} />,
+                    def.title,
+                  ),
+                  renderTabAddon: () => {
+                    const count = getStoreCount(def.store);
+                    // like Steam's native tabs, always show the count (0
+                    // included) so empty stores still read consistently
+                    return (
+                      <span
+                        className={gamepadTabbedPageClasses.TabCount}
+                      >
+                        {count}
+                      </span>
+                    );
+                  },
+                }));
 
                 const patchedTabs = tabs.concat(customTabs);
                 return isNested ? [patchedTabs, original[1]] : patchedTabs;

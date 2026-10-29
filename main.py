@@ -18,7 +18,12 @@ from pathlib import Path
 
 import decky
 
-from heroic_library import find_heroic_config, get_library, launch_url
+from heroic_library import (
+    find_heroic_config,
+    get_library,
+    is_store_logged_in,
+    launch_url,
+)
 from steam_shortcuts import (
     build_shortcut,
     is_ours,
@@ -36,7 +41,6 @@ DEFAULT_SETTINGS = {
     "amazonTab": True,
     "sideloadTab": True,
     "syncAllGames": False,
-    "configPath": "",
 }
 
 SETTINGS_DIR = Path(
@@ -94,6 +98,36 @@ def _image_type(data: bytes) -> str | None:
 
 # Serializes shortcuts.vdf read-modify-write across concurrent syncs
 _vdf_lock = threading.Lock()
+# Prevents concurrent flatpak installations
+_install_lock = threading.Lock()
+_install_state: dict[str, Any] = {
+    "status": "idle",
+    "logs": [],
+    "error": None,
+}
+
+
+def _is_flatpak_available() -> bool:
+    flatpak = shutil.which("flatpak") or "/usr/bin/flatpak"
+    return bool(shutil.which(flatpak) or (Path(flatpak).exists() and os.access(flatpak, os.X_OK)))
+
+
+def _is_heroic_installed() -> bool:
+    flatpak = shutil.which("flatpak") or "/usr/bin/flatpak"
+    if shutil.which(flatpak) or (Path(flatpak).exists() and os.access(flatpak, os.X_OK)):
+        try:
+            res = subprocess.run(
+                [flatpak, "info", FLATPAK_ID],
+                capture_output=True,
+                timeout=5,
+            )
+            if res.returncode == 0:
+                return True
+        except Exception:
+            pass
+    if shutil.which("heroic") is not None:
+        return True
+    return False
 
 
 # Artwork for the "Heroic Games Launcher" shortcut, from SteamGridDB.
@@ -110,28 +144,25 @@ class Plugin:
     def _resolve_heroic_config(self) -> tuple[Path | None, list[str]]:
         """Resolve the Heroic config dir.
 
-        Order: HEROIC_CONFIG_DIR env var, the plugin's configPath setting,
-        the flatpak location, then a native install. Returns
-        (config_dir_or_None, probed_paths) — probed paths are used for the
-        user-facing error message when nothing is found.
+        Order: HEROIC_CONFIG_DIR env var (dev/testing), then the standard
+        flatpak and native install directories. Returns
+        (config_dir_or_None, probed_paths).
         """
-        settings = _load_settings()
-        custom = (
-            os.environ.get("HEROIC_CONFIG_DIR") or settings.get("configPath")
-        )
-        probed = []
-        if custom:
-            probed.append(str(Path(custom).expanduser()))
-        probed += [
-            str(p) for p in
-            (
-                Path.home() / ".var" / "app" / FLATPAK_ID / "config" / "heroic",
-                Path.home() / ".config" / "heroic",
-            )
+        home = Path(os.environ.get("DECKY_USER_HOME") or Path.home())
+        candidates = [
+            home / ".var" / "app" / FLATPAK_ID / "config" / "heroic",
+            home / ".config" / "heroic",
         ]
-        config = find_heroic_config(custom)
-        if config is not None and str(config) not in probed:
-            probed.append(str(config))
+        env_override = os.environ.get("HEROIC_CONFIG_DIR")
+        if env_override:
+            candidates.insert(0, Path(env_override).expanduser())
+        probed = [str(p) for p in candidates]
+        config = find_heroic_config(candidates)
+        if config is None:
+            for p in candidates:
+                if p.is_dir():
+                    config = p
+                    break
         return config, probed
 
     def _heroic_install_kind(self, config: Path | None) -> str | None:
@@ -175,29 +206,175 @@ class Plugin:
         return env
 
     async def check_heroic(self) -> dict:
-        """Whether Heroic is installed, and which config paths were probed.
-
-        Cheap call (no library parsing) used by the frontend to warn in the
-        settings panel and to re-check after the user sets a custom path.
-        """
+        """Whether Heroic is installed and configured, and store login status."""
         config, probed = self._resolve_heroic_config()
-        return {"found": config is not None, "probed": probed}
+        installed = _is_heroic_installed()
+        stores = {
+            "gog": is_store_logged_in(config, "gog") if installed else False,
+            "epic": is_store_logged_in(config, "epic") if installed else False,
+            "amazon": is_store_logged_in(config, "amazon") if installed else False,
+            "sideload": installed,
+        }
+        return {
+            "found": config is not None and (config / "store_cache").is_dir(),
+            "installed": installed,
+            "has_flatpak": _is_flatpak_available(),
+            "stores": stores,
+            "probed": probed,
+        }
+
+    async def start_install_heroic(self) -> dict:
+        """Start installing Heroic in background and return current status."""
+        global _install_state
+        if not _install_lock.acquire(blocking=False):
+            return {
+                "status": _install_state["status"],
+                "logs": list(_install_state["logs"]),
+                "error": _install_state["error"],
+            }
+
+        _install_state = {
+            "status": "running",
+            "logs": ["Starting Heroic Games Launcher installation..."],
+            "error": None,
+        }
+        thread = threading.Thread(target=self._run_install_worker, daemon=True)
+        thread.start()
+        return {
+            "status": "running",
+            "logs": list(_install_state["logs"]),
+            "error": None,
+        }
+
+    async def get_install_progress(self) -> dict:
+        """Return the current installation status and logs."""
+        return {
+            "status": _install_state["status"],
+            "logs": list(_install_state["logs"]),
+            "error": _install_state["error"],
+        }
+
+    async def install_heroic(self) -> dict:
+        """Install Heroic Games Launcher via flatpak (awaits completion)."""
+        await self.start_install_heroic()
+        while _install_state["status"] == "running":
+            await asyncio.sleep(0.5)
+        return {
+            "success": _install_state["status"] == "success",
+            "error": _install_state["error"],
+        }
+
+    def _run_install_worker(self) -> None:
+        global _install_state
+        flatpak = shutil.which("flatpak") or "/usr/bin/flatpak"
+        if not (shutil.which(flatpak) or (Path(flatpak).exists() and os.access(flatpak, os.X_OK))):
+            _install_state["status"] = "error"
+            _install_state["error"] = "Flatpak command not found on system"
+            _install_state["logs"].append("Error: Flatpak command not found on system.")
+            _install_lock.release()
+            return
+
+        try:
+            is_root = (os.geteuid() == 0) if hasattr(os, "geteuid") else False
+            scope = [] if is_root else ["--user"]
+
+            _install_state["logs"].append("Configuring Flathub repository...")
+            decky.logger.info("Configuring Flathub repository...")
+
+            remote_cmd = [
+                flatpak,
+                "remote-add",
+                *scope,
+                "--if-not-exists",
+                "flathub",
+                "https://dl.flathub.org/repo/flathub.flatpakrepo",
+            ]
+            try:
+                proc_remote = subprocess.run(
+                    remote_cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+                if proc_remote.returncode != 0 and proc_remote.stderr:
+                    _install_state["logs"].append(f"Remote notice: {proc_remote.stderr.strip()}")
+            except Exception as exc:
+                _install_state["logs"].append(f"Warning adding remote: {exc}")
+
+            install_cmd = [
+                flatpak,
+                "install",
+                *scope,
+                "-y",
+                "--noninteractive",
+                "flathub",
+                FLATPAK_ID,
+            ]
+            _install_state["logs"].append(f"Running: {' '.join(install_cmd)}")
+            decky.logger.info("Installing Heroic via flatpak: %s", " ".join(install_cmd))
+
+            proc = subprocess.Popen(
+                install_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+
+            if proc.stdout:
+                for line in iter(proc.stdout.readline, ""):
+                    clean = line.strip()
+                    if clean:
+                        _install_state["logs"].append(clean)
+                        if len(_install_state["logs"]) > 500:
+                            _install_state["logs"] = _install_state["logs"][-400:]
+                proc.stdout.close()
+
+            ret = proc.wait(timeout=600)
+            if ret == 0:
+                _install_state["status"] = "success"
+                _install_state["logs"].append("Heroic installation completed successfully!")
+                decky.logger.info("Heroic installation completed successfully.")
+            else:
+                _install_state["status"] = "error"
+                err = f"Flatpak exited with code {ret}"
+                _install_state["error"] = err
+                _install_state["logs"].append(f"Error: {err}")
+                decky.logger.error("Heroic installation failed: %s", err)
+        except Exception as exc:
+            _install_state["status"] = "error"
+            _install_state["error"] = str(exc)
+            _install_state["logs"].append(f"Exception: {exc}")
+            decky.logger.error("Heroic installation exception: %s", exc)
+        finally:
+            _install_lock.release()
 
     async def get_library(self) -> dict:
         """Return the merged GOG+Epic library with installed status."""
         config, probed = self._resolve_heroic_config()
-        if config is None:
+        installed = _is_heroic_installed()
+        stores = {
+            "gog": is_store_logged_in(config, "gog") if installed else False,
+            "epic": is_store_logged_in(config, "epic") if installed else False,
+            "amazon": is_store_logged_in(config, "amazon") if installed else False,
+            "sideload": installed,
+        }
+        if config is None or not installed:
             return {
                 "games": [],
                 "errors": [
                     "Heroic not found. Looked in: " + "; ".join(probed)
                 ],
                 "heroic_found": False,
+                "installed": installed,
+                "stores": stores,
                 "probed": probed,
             }
         result = get_library(config)
         result["config"] = str(config)
         result["heroic_found"] = True
+        result["installed"] = installed
+        result["stores"] = stores
         result["probed"] = probed
         if result["errors"]:
             decky.logger.warning(

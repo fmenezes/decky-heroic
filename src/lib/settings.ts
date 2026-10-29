@@ -5,8 +5,6 @@ export interface PluginSettings {
   epicTab: boolean;
   amazonTab: boolean;
   sideloadTab: boolean;
-  /** Custom Heroic config dir (empty = auto-detect). */
-  configPath: string;
 }
 
 const getSettings = callable<[], PluginSettings>("get_settings");
@@ -19,7 +17,6 @@ const DEFAULTS: PluginSettings = {
   epicTab: true,
   amazonTab: true,
   sideloadTab: true,
-  configPath: "",
 };
 
 let current: PluginSettings = { ...DEFAULTS };

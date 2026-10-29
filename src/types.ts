@@ -1,5 +1,12 @@
 export type Store = "gog" | "epic" | "amazon" | "sideload";
 
+export interface StoresStatus {
+  gog: boolean;
+  epic: boolean;
+  amazon: boolean;
+  sideload: boolean;
+}
+
 export interface GameEntry {
   title: string;
   app_name: string;
@@ -21,6 +28,10 @@ export interface LibraryResult {
   config?: string;
   /** False when Heroic was not detected on this machine. */
   heroic_found?: boolean;
+  /** Whether Heroic is installed. */
+  installed?: boolean;
+  /** Store login statuses. */
+  stores?: Partial<StoresStatus>;
   /** Config paths probed during detection (for the settings warning). */
   probed?: string[];
 }

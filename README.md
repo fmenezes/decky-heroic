@@ -31,7 +31,7 @@ Heroic (flatpak) with your store(s) logged in and library synced once.
 In the plugin's Quick Access panel you can turn each store's tab on or off,
 and open Heroic itself. That's it.
 
-## How it works (short version)
+## How it works
 
 No CLIs, no scraping: the plugin reads Heroic's own library cache files,
 injects tabs into the library (the trick pioneered by

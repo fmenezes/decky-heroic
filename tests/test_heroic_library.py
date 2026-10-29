@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "py_modules"))
 from heroic_library import (
     find_heroic_config,
     get_library,
+    is_store_logged_in,
     launch_url,
     parse_library_file,
     parse_sideloads,
@@ -119,35 +120,14 @@ class FindHeroicConfigTests(unittest.TestCase):
                 find_heroic_config(candidates=[bad, good]), good
             )
 
-    def test_custom_path_takes_precedence(self):
+    def test_candidate_order_takes_precedence(self):
         with tempfile.TemporaryDirectory() as tmp1, tempfile.TemporaryDirectory() as tmp2:
-            default = self._candidate(tmp1)
-            custom = self._candidate(tmp2)
+            first = self._candidate(tmp1)
+            second = self._candidate(tmp2)
             self.assertEqual(
-                find_heroic_config(
-                    str(custom), candidates=[default]
-                ),
-                custom,
+                find_heroic_config(candidates=[first, second]),
+                first,
             )
-
-    def test_expands_user_in_custom_path(self):
-        # create the candidate under $HOME so a ~/... path can be expanded
-        home_tmp = Path.home() / ".heroic-library-test-tmp"
-        home_tmp.mkdir(exist_ok=True)
-        try:
-            found = home_tmp / "heroic-config"
-            found.joinpath("store_cache").mkdir(parents=True, exist_ok=True)
-            rel = "~/" + str(found.relative_to(Path.home()))
-            self.assertEqual(
-                find_heroic_config(
-                    rel, candidates=[home_tmp / "definitely-missing"]
-                ),
-                found,
-            )
-        finally:
-            import shutil
-
-            shutil.rmtree(home_tmp, ignore_errors=True)
 
     def test_returns_none_when_nothing_found(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -253,6 +233,33 @@ class AmazonAndSideloadTests(unittest.TestCase):
             )
             # missing nile/legendary libraries are not errors anymore
             self.assertEqual(result["errors"], [])
+
+
+class StoreLoggedInTests(unittest.TestCase):
+    def test_sideload_always_logged_in(self):
+        self.assertTrue(is_store_logged_in(None, "sideload"))
+
+    def test_missing_config_returns_false(self):
+        self.assertFalse(is_store_logged_in(None, "gog"))
+        self.assertFalse(is_store_logged_in(None, "epic"))
+        self.assertFalse(is_store_logged_in(None, "amazon"))
+
+    def test_detects_library_cache_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            store_cache = config / "store_cache"
+            store_cache.mkdir()
+            self.assertFalse(is_store_logged_in(config, "gog"))
+            (store_cache / "gog_library.json").write_text("{}", encoding="utf-8")
+            self.assertTrue(is_store_logged_in(config, "gog"))
+
+    def test_detects_auth_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            gog_store = config / "gog_store"
+            gog_store.mkdir()
+            (gog_store / "auth.json").write_text("{}", encoding="utf-8")
+            self.assertTrue(is_store_logged_in(config, "gog"))
 
 
 if __name__ == "__main__":

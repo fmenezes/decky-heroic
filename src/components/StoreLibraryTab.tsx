@@ -113,6 +113,11 @@ export const StoreLibraryTab = ({ store }: Props) => {
           {relevantErrors.join("; ")}
         </div>
       )}
+      {!loading && games.length === 0 && relevantErrors.length === 0 && (
+        <div style={{ opacity: 0.6, fontSize: "14px", padding: "20px 0" }}>
+          No games found in your {label} library.
+        </div>
+      )}
       {rows.map((row, rowIndex) => (
         <Focusable
           key={rowIndex}
