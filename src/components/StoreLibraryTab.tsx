@@ -78,6 +78,7 @@ export const StoreLibraryTab = ({ store }: Props) => {
         height: "100%",
         overflowY: "auto",
         boxSizing: "border-box",
+        scrollPaddingTop: "20px",
       }}
     >
       {loading && (
@@ -108,7 +109,7 @@ export const StoreLibraryTab = ({ store }: Props) => {
             rowGap: `${CARD_ROW_GAP}px`,
             justifyContent: "space-between",
             width: "100%",
-            padding: "8px",
+            padding: "20px 8px 32px 8px",
             boxSizing: "border-box",
           }}
         >
