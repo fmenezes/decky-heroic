@@ -19,11 +19,11 @@ const STORE_NAMES: Record<string, string> = {
 
 const storeName = (store: string) => STORE_NAMES[store] ?? store;
 
-// Steam native library grid specs: 172x258 card, 16px min col gap, 42px row gap, space-between
-const CARD_WIDTH = 172;
-const CARD_HEIGHT = 258;
+// Steam native library grid specs: 148x222 card, 16px min col gap, 24px row gap, space-between
+const CARD_WIDTH = 148;
+const CARD_HEIGHT = 222;
 const CARD_COL_GAP = 16;
-const CARD_ROW_GAP = 42;
+const CARD_ROW_GAP = 24;
 
 export const StoreLibraryTab = ({ store }: Props) => {
   const [games, setGames] = useState<GameEntry[]>([]);
@@ -108,7 +108,7 @@ export const StoreLibraryTab = ({ store }: Props) => {
             rowGap: `${CARD_ROW_GAP}px`,
             justifyContent: "space-between",
             width: "100%",
-            padding: "8px",
+            padding: "8px 0",
             boxSizing: "border-box",
           }}
         >

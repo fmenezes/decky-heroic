@@ -6,10 +6,9 @@ interface Props {
   onSelect: (game: GameEntry) => void;
 }
 
-// Steam cover art is 600x900; these dimensions match Steam's native
-// library tiles (172x258, 2:3 aspect ratio).
-const CARD_WIDTH = 172;
-const CARD_HEIGHT = 258;
+// Steam native library grid specs: 148x222 card (2:3 aspect ratio)
+const CARD_WIDTH = 148;
+const CARD_HEIGHT = 222;
 
 export const GameCard = ({ game, onSelect }: Props) => {
   return (
