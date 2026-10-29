@@ -6,6 +6,13 @@ export type { GameEntry, LibraryResult, Store, StoresStatus };
 
 export const getLibrary = callable<[], LibraryResult>("get_library");
 
+export interface HeroicWarning {
+  id: string;
+  level: "warning" | "info" | "error";
+  title: string;
+  message: string;
+}
+
 export interface HeroicStatus {
   /** False once the backend has confirmed Heroic is not installed or configured. Starts
    * optimistic (true) so tabs are not needlessly withheld at load. */
@@ -20,6 +27,8 @@ export interface HeroicStatus {
   probed: string[];
   /** True until the first backend check has completed. */
   checked: boolean;
+  /** Configuration warnings detected from Heroic config. */
+  warnings: HeroicWarning[];
 }
 
 let heroicStatus: HeroicStatus = {
@@ -34,6 +43,7 @@ let heroicStatus: HeroicStatus = {
   },
   probed: [],
   checked: false,
+  warnings: [],
 };
 const statusSubs = new Set<() => void>();
 
@@ -61,6 +71,7 @@ const checkHeroic = callable<
     has_flatpak?: boolean;
     stores?: Partial<StoresStatus>;
     probed?: string[];
+    warnings?: HeroicWarning[];
   }
 >("check_heroic");
 
@@ -99,6 +110,7 @@ export async function refreshHeroicStatus(): Promise<void> {
       },
       probed: res.probed ?? [],
       checked: true,
+      warnings: res.warnings ?? [],
     });
   } catch (e) {
     console.error("heroic check failed", e);
@@ -355,6 +367,7 @@ export async function primeLibrary(): Promise<void> {
         },
         probed: res.probed ?? [],
         checked: true,
+        warnings: heroicStatus.warnings,
       });
       void refreshHeroicStatus();
     } else {

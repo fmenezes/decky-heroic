@@ -139,6 +139,46 @@ export const GameLibraryPanel = () => {
         </ButtonItem>
       </PanelSectionRow>
 
+      {heroicStatus.warnings && heroicStatus.warnings.length > 0 && (
+        <PanelSection title="Heroic Configuration Warnings">
+          {heroicStatus.warnings.map((w) => (
+            <PanelSectionRow key={w.id}>
+              <div
+                style={{
+                  background: "rgba(245, 166, 35, 0.12)",
+                  borderLeft: "4px solid #f5a623",
+                  padding: "8px 12px",
+                  borderRadius: "2px",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  marginBottom: "4px",
+                }}
+              >
+                <div
+                  style={{
+                    color: "#f5a623",
+                    fontWeight: "bold",
+                    fontSize: "12px",
+                    marginBottom: "4px",
+                  }}
+                >
+                  {w.title}
+                </div>
+                <div
+                  style={{
+                    color: "#d0d0d0",
+                    fontSize: "11px",
+                    lineHeight: "1.4",
+                  }}
+                >
+                  {w.message}
+                </div>
+              </div>
+            </PanelSectionRow>
+          ))}
+        </PanelSection>
+      )}
+
       <PanelSectionRow>
         <div style={{ opacity: "0.6", fontSize: "12px" }}>
           Active store libraries appear as tabs in the Steam library. Opening a

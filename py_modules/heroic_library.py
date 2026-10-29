@@ -176,3 +176,67 @@ def launch_url(app_name: str, runner: str) -> str:
         f"heroic://launch?appName={urllib.parse.quote(app_name)}"
         f"&runner={urllib.parse.quote(runner)}"
     )
+
+
+def inspect_heroic_settings(
+    config_dir: Path | None = None,
+) -> list[dict[str, str]]:
+    """Inspect Heroic configuration and return warnings for settings that
+    negatively affect Steam Game Mode integration.
+    """
+    if config_dir is None:
+        config_dir = find_heroic_config()
+    if not config_dir:
+        return []
+
+    config_file = config_dir / "config.json"
+    if not config_file.is_file():
+        return []
+
+    try:
+        data = json.loads(config_file.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    settings = data.get("defaultSettings", data)
+    warnings: list[dict[str, str]] = []
+
+    # 1. Check addSteamShortcuts (Duplicate Shortcuts Risk)
+    if settings.get("addSteamShortcuts") is True:
+        warnings.append({
+            "id": "add_steam_shortcuts",
+            "level": "warning",
+            "title": "Duplicate Shortcuts Risk",
+            "message": "Heroic's 'Add games to Steam automatically' is enabled. We recommend turning this off in Heroic settings to prevent duplicate library entries.",
+        })
+
+    # 2. Check hideWindowOnProtocolLaunch
+    if settings.get("hideWindowOnProtocolLaunch") is False:
+        warnings.append({
+            "id": "hide_window_on_launch",
+            "level": "warning",
+            "title": "Heroic Window Visible on Launch",
+            "message": "Heroic is set to show its window when launching games. Enable 'Minimize/Hide window on launch' in Heroic settings for a seamless Game Mode experience.",
+        })
+
+    # 3. Check wineVersion / runner
+    wine_version = settings.get("wineVersion")
+    if not wine_version or not isinstance(wine_version, dict) or not wine_version.get("bin"):
+        warnings.append({
+            "id": "missing_wine_version",
+            "level": "warning",
+            "title": "No Default Wine / Proton Selected",
+            "message": "No default Wine or Proton version is configured in Heroic. Windows games may fail to launch until a runner is selected in Heroic.",
+        })
+    else:
+        bin_path = Path(wine_version.get("bin", ""))
+        if bin_path and not bin_path.exists():
+            warnings.append({
+                "id": "broken_wine_version",
+                "level": "warning",
+                "title": "Configured Wine / Proton Missing",
+                "message": f"Default runner '{wine_version.get('name', 'Proton')}' was not found on disk ({bin_path}). Games may fail to launch.",
+            })
+
+    return warnings
+

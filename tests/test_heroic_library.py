@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "py_modules"))
 from heroic_library import (
     find_heroic_config,
     get_library,
+    inspect_heroic_settings,
     is_store_logged_in,
     launch_url,
     parse_library_file,
@@ -260,6 +261,100 @@ class StoreLoggedInTests(unittest.TestCase):
             gog_store.mkdir()
             (gog_store / "auth.json").write_text("{}", encoding="utf-8")
             self.assertTrue(is_store_logged_in(config, "gog"))
+
+
+class InspectHeroicSettingsTests(unittest.TestCase):
+    def test_none_or_missing_config_returns_empty(self):
+        self.assertEqual(inspect_heroic_settings(None), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(inspect_heroic_settings(Path(tmp)), [])
+
+    def test_optimal_settings_has_no_warnings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            wine_bin = config / "wine"
+            wine_bin.write_text("fake binary")
+            cfg_data = {
+                "defaultSettings": {
+                    "addSteamShortcuts": False,
+                    "hideWindowOnProtocolLaunch": True,
+                    "wineVersion": {
+                        "bin": str(wine_bin),
+                        "name": "Proton Test",
+                    },
+                }
+            }
+            (config / "config.json").write_text(json.dumps(cfg_data), encoding="utf-8")
+            warnings = inspect_heroic_settings(config)
+            self.assertEqual(warnings, [])
+
+    def test_warns_on_add_steam_shortcuts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            wine_bin = config / "wine"
+            wine_bin.write_text("fake binary")
+            cfg_data = {
+                "defaultSettings": {
+                    "addSteamShortcuts": True,
+                    "hideWindowOnProtocolLaunch": True,
+                    "wineVersion": {"bin": str(wine_bin), "name": "Proton"},
+                }
+            }
+            (config / "config.json").write_text(json.dumps(cfg_data), encoding="utf-8")
+            warnings = inspect_heroic_settings(config)
+            self.assertEqual(len(warnings), 1)
+            self.assertEqual(warnings[0]["id"], "add_steam_shortcuts")
+
+    def test_warns_on_show_window_on_launch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            wine_bin = config / "wine"
+            wine_bin.write_text("fake binary")
+            cfg_data = {
+                "defaultSettings": {
+                    "addSteamShortcuts": False,
+                    "hideWindowOnProtocolLaunch": False,
+                    "wineVersion": {"bin": str(wine_bin), "name": "Proton"},
+                }
+            }
+            (config / "config.json").write_text(json.dumps(cfg_data), encoding="utf-8")
+            warnings = inspect_heroic_settings(config)
+            self.assertEqual(len(warnings), 1)
+            self.assertEqual(warnings[0]["id"], "hide_window_on_launch")
+
+    def test_warns_on_missing_wine_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            cfg_data = {
+                "defaultSettings": {
+                    "addSteamShortcuts": False,
+                    "hideWindowOnProtocolLaunch": True,
+                    "wineVersion": None,
+                }
+            }
+            (config / "config.json").write_text(json.dumps(cfg_data), encoding="utf-8")
+            warnings = inspect_heroic_settings(config)
+            self.assertEqual(len(warnings), 1)
+            self.assertEqual(warnings[0]["id"], "missing_wine_version")
+
+    def test_warns_on_broken_wine_version_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            cfg_data = {
+                "defaultSettings": {
+                    "addSteamShortcuts": False,
+                    "hideWindowOnProtocolLaunch": True,
+                    "wineVersion": {
+                        "bin": "/nonexistent/path/to/proton",
+                        "name": "Missing Proton",
+                    },
+                }
+            }
+            (config / "config.json").write_text(json.dumps(cfg_data), encoding="utf-8")
+            warnings = inspect_heroic_settings(config)
+            self.assertEqual(len(warnings), 1)
+            self.assertEqual(warnings[0]["id"], "broken_wine_version")
+
 
 
 if __name__ == "__main__":

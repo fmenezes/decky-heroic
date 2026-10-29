@@ -21,6 +21,7 @@ import decky
 from heroic_library import (
     find_heroic_config,
     get_library,
+    inspect_heroic_settings,
     is_store_logged_in,
     launch_url,
 )
@@ -215,12 +216,14 @@ class Plugin:
             "amazon": is_store_logged_in(config, "amazon") if installed else False,
             "sideload": installed,
         }
+        warnings = inspect_heroic_settings(config) if installed and config else []
         return {
             "found": config is not None and (config / "store_cache").is_dir(),
             "installed": installed,
             "has_flatpak": _is_flatpak_available(),
             "stores": stores,
             "probed": probed,
+            "warnings": warnings,
         }
 
     async def start_install_heroic(self) -> dict:
