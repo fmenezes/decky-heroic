@@ -46,8 +46,8 @@ plugins dir:
 
 ```bash
 npm run pack
-scp heroic-library.zip user@machinename.local:/tmp/
-ssh user@machinename.local "cd ~/homebrew/plugins && sudo rm -rf heroic-library && sudo unzip -o /tmp/heroic-library.zip && rm /tmp/heroic-library.zip"
+scp decky-heroic.zip user@machinename.local:/tmp/
+ssh user@machinename.local "cd ~/homebrew/plugins && sudo rm -rf heroic-library && sudo unzip -o /tmp/decky-heroic.zip && rm /tmp/decky-heroic.zip"
 ```
 
 Restart the plugin via the Decky menu to pick up changes.
@@ -57,7 +57,7 @@ Restart the plugin via the Decky menu to pick up changes.
 - **CI** (`.github/workflows/ci.yml`): on every push and pull request — runs
   the backend unit tests, typechecks, and builds the frontend
 - **Publish** (`.github/workflows/publish.yml`): on every `v*` tag —
-  runs tests + build, packages `heroic-library.zip` in the decky-loader
+  runs tests + build, packages `decky-heroic.zip` in the decky-loader
   plugin distribution layout, and attaches it to a GitHub Release
 
 ```bash

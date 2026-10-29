@@ -16,11 +16,11 @@ the plugin settings and it sits in your library like any other game.
 ## Installing
 
 Grab the latest
-[`heroic-library.zip`](https://github.com/fmenezes/decky-heroic/releases/latest)
+[`decky-heroic.zip`](https://github.com/fmenezes/decky-heroic/releases/latest)
 and install it via **Decky → Developer → Install plugin from URL/file**, or:
 
 ```bash
-sudo decky-plugin-cli install https://github.com/fmenezes/decky-heroic/releases/latest/download/heroic-library.zip
+sudo decky-plugin-cli install https://github.com/fmenezes/decky-heroic/releases/latest/download/decky-heroic.zip
 ```
 
 You need [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader) and
