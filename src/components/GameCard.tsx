@@ -7,7 +7,7 @@ interface Props {
   onSelect: (game: GameEntry) => void;
 }
 
-// Steam native library grid specs: 134x201 card (2:3 aspect ratio)
+// Steam native library grid specs: 134x201 card (2:3 aspect ratio, 5-col layout)
 const CARD_WIDTH = 134;
 const CARD_HEIGHT = 201;
 
@@ -29,12 +29,12 @@ export const GameCard = ({ game, onSelect }: Props) => {
         cursor: "pointer",
         flexShrink: 0,
         borderRadius: "4px",
-        transform: focused ? "scale(1.053)" : "scale(1)",
+        transform: focused ? "scale(1.05)" : "scale(1)",
         transformOrigin: "center center",
         zIndex: focused ? 10 : 1,
         boxShadow: focused
-          ? "0px 16px 24px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(255, 255, 255, 0.65)"
-          : "0px 4px 8px rgba(0, 0, 0, 0.25)",
+          ? "0px 14px 20px rgba(0, 0, 0, 0.55)"
+          : "0px 3px 6px rgba(0, 0, 0, 0.25)",
         transition:
           "transform 0.25s cubic-bezier(0.16, 0.86, 0.43, 0.99), box-shadow 0.25s ease, z-index 0.25s step-end",
       }}

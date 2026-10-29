@@ -19,7 +19,7 @@ const STORE_NAMES: Record<string, string> = {
 
 const storeName = (store: string) => STORE_NAMES[store] ?? store;
 
-// Steam native library grid specs: 134x201 card, 16px min col gap, 42px row gap, space-between
+// Steam native library grid specs: 134x201 card (5-column layout matching Steam handheld view)
 const CARD_WIDTH = 134;
 const CARD_HEIGHT = 201;
 const CARD_COL_GAP = 16;
