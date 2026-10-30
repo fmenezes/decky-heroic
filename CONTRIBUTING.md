@@ -34,7 +34,6 @@ npm run watch       # Dev watch mode
 │   ├── lib/                   # shared callables, settings store
 │   ├── patches/               # LibraryPatch.tsx (tab injection)
 │   └── components/           # GameLibraryPanel, GameCard, StoreLibraryTab
-├── assets/                    # bundled artwork (launcher tile)
 ├── tests/                     # Python unit tests + fixtures
 └── .github/workflows/         # ci.yml + publish.yml
 ```

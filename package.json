@@ -8,7 +8,7 @@
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit",
     "test": "python3 -m unittest discover -s tests -v",
-    "pack": "npm run build && rm -rf pkg decky-heroic.zip && mkdir -p pkg/heroic-library && cp plugin.json main.py package.json README.md LICENSE pkg/heroic-library/ && cp -r py_modules dist assets pkg/heroic-library/ && rm -f pkg/heroic-library/dist/*.map && find pkg -name __pycache__ -type d -exec rm -rf {} + && (cd pkg && zip -r ../decky-heroic.zip heroic-library) && rm -rf pkg"
+    "pack": "npm run build && rm -rf pkg decky-heroic.zip && mkdir -p pkg/heroic-library && cp plugin.json main.py package.json README.md LICENSE pkg/heroic-library/ && cp -r py_modules dist pkg/heroic-library/ && rm -f pkg/heroic-library/dist/*.map && find pkg -name __pycache__ -type d -exec rm -rf {} + && (cd pkg && zip -r ../decky-heroic.zip heroic-library) && rm -rf pkg"
   },
   "keywords": [
     "decky",

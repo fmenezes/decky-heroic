@@ -610,8 +610,7 @@ class Plugin:
 
     async def get_launcher_art(self) -> dict:
         """Return artwork for the 'Heroic Games Launcher' shortcut: downloads
-        from SteamGridDB (bundled assets as offline fallback)."""
-        assets = Path(__file__).parent / "assets"
+        from SteamGridDB on the fly, caching in the runtime directory."""
         runtime_dir = Path(
             os.environ.get("DECKY_PLUGIN_RUNTIME_DIR", "/tmp/heroic-library")
         )
@@ -620,24 +619,40 @@ class Plugin:
         out: dict = {}
         for role in ("grid", "wide", "hero", "logo", "icon"):
             data: bytes | None = None
-            url = LAUNCHER_ART_URLS.get(role)
-            if url:
+            cache_file = runtime_dir / f"launcher-{role}.png"
+            if cache_file.is_file():
                 try:
-                    candidate = _download_bytes(url)
-                    if _image_type(candidate) is not None:
-                        data = candidate
-                except Exception as exc:  # noqa: BLE001 - fallback below
-                    decky.logger.warning("SGDB art fetch failed (%s): %s", role, exc)
+                    cached = cache_file.read_bytes()
+                    if _image_type(cached) is not None:
+                        data = cached
+                except OSError:
+                    pass
+
             if data is None:
-                fallback = assets / f"launcher-{role}.png"
-                if fallback.is_file():
-                    data = fallback.read_bytes()
+                url = LAUNCHER_ART_URLS.get(role)
+                if url:
+                    try:
+                        candidate = _download_bytes(url)
+                        if _image_type(candidate) is not None:
+                            data = candidate
+                            try:
+                                cache_file.write_bytes(candidate)
+                            except OSError:
+                                pass
+                    except Exception as exc:  # noqa: BLE001 - fallback below
+                        decky.logger.warning("SGDB art fetch failed (%s): %s", role, exc)
+
             if data is None:
                 continue
+
             if role == "icon":
                 # SetShortcutIcon takes a file path, so persist it
                 icon_path = runtime_dir / "launcher-icon.png"
-                icon_path.write_bytes(data)
+                if not icon_path.is_file() and data:
+                    try:
+                        icon_path.write_bytes(data)
+                    except OSError:
+                        pass
                 out["icon_path"] = str(icon_path)
             else:
                 out[f"{role}_b64"] = base64.b64encode(data).decode("ascii")
