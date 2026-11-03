@@ -1,8 +1,12 @@
 {
   "name": "heroic-decky-plugin",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Decky Loader plugin: browse and launch your Heroic Games Launcher library (GOG + Epic) from the Steam Deck Quick Access menu.",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/fmenezes/decky-heroic.git"
+  },
   "scripts": {
     "build": "rollup -c",
     "watch": "rollup -c -w",
