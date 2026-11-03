@@ -355,6 +355,54 @@ class InspectHeroicSettingsTests(unittest.TestCase):
             self.assertEqual(len(warnings), 1)
             self.assertEqual(warnings[0]["id"], "broken_wine_version")
 
+    def test_windows_no_wine_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            cfg_data = {
+                "defaultSettings": {
+                    "addSteamShortcuts": False,
+                    "hideWindowOnProtocolLaunch": True,
+                    "wineVersion": None,
+                }
+            }
+            (config / "config.json").write_text(json.dumps(cfg_data), encoding="utf-8")
+            warnings = inspect_heroic_settings(config, platform="windows")
+            self.assertEqual(warnings, [])
+
+    def test_macos_gameportingtoolkit_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            cfg_data = {
+                "defaultSettings": {
+                    "addSteamShortcuts": False,
+                    "hideWindowOnProtocolLaunch": True,
+                    "wineVersion": None,
+                }
+            }
+            (config / "config.json").write_text(json.dumps(cfg_data), encoding="utf-8")
+            warnings = inspect_heroic_settings(config, platform="macos")
+            self.assertEqual(len(warnings), 1)
+            self.assertIn("Game Porting Toolkit", warnings[0]["title"])
+
+    def test_macos_gamemode_warning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = Path(tmp)
+            wine_bin = config / "wine"
+            wine_bin.write_text("fake binary")
+            cfg_data = {
+                "defaultSettings": {
+                    "addSteamShortcuts": False,
+                    "hideWindowOnProtocolLaunch": True,
+                    "useGameMode": True,
+                    "wineVersion": {"bin": str(wine_bin), "name": "GPTK"},
+                }
+            }
+            (config / "config.json").write_text(json.dumps(cfg_data), encoding="utf-8")
+            warnings = inspect_heroic_settings(config, platform="macos")
+            self.assertEqual(len(warnings), 1)
+            self.assertEqual(warnings[0]["id"], "gamemode_on_macos")
+
+
 
 
 if __name__ == "__main__":

@@ -53,6 +53,15 @@ class VdfRoundtripTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             serialize_vdf({"x": 1.5})
 
+    def test_large_appid_roundtrip(self):
+        large_id = 0x80000000 | 12345
+        entry = build_shortcut("Test", "exe", "opts", "dir", "marker", appid=large_id)
+        doc = {"shortcuts": {"0": entry}}
+        encoded = write_shortcuts(doc)
+        parsed = read_shortcuts(encoded)
+        self.assertEqual(parsed["shortcuts"]["0"]["appid"], large_id)
+
+
 
 class ShortcutTests(unittest.TestCase):
     def test_shortcut_id_is_stable_and_high_bit_set(self):

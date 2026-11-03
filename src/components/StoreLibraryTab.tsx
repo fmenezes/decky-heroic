@@ -116,9 +116,13 @@ export const StoreLibraryTab = ({ store }: Props) => {
       const appid = await ensureSteamShortcut(game);
       Navigation.Navigate(`/library/app/${appid}`);
     } catch (e) {
+      console.error("ensureSteamShortcut failed:", e);
+      const errStr =
+        (e as any)?.message ||
+        (typeof e === "object" ? JSON.stringify(e) : String(e));
       toaster.toast({
         title: game.title,
-        body: String(e),
+        body: errStr,
       });
     }
   }, []);

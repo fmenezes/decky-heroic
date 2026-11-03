@@ -126,6 +126,50 @@ export const addShortcut = callable<
   { appid: number; added: number; removed: number }
 >("add_shortcut");
 
+export const getShortcutParams = callable<
+  [store?: string, app_name?: string],
+  { exe: string; start_dir: string; launch_options: string; url: string }
+>("get_shortcut_params");
+
+async function resolveShortcutParams(
+  store?: string,
+  appName?: string,
+  fallbackUrl: string = "",
+): Promise<{ exe: string; start_dir: string; launch_options: string }> {
+  try {
+    const res = await getShortcutParams(store ?? "", appName ?? "");
+    if (res?.exe) {
+      return res;
+    }
+  } catch (e) {
+    console.warn("getShortcutParams backend call failed, using client fallback", e);
+  }
+
+  // Fallback if backend is unreachable:
+  const isMac =
+    (typeof navigator !== "undefined" &&
+      (navigator.userAgent.includes("Mac") ||
+        (navigator as any).userAgentData?.platform === "macOS" ||
+        navigator.platform.includes("Mac"))) ||
+    false;
+
+  if (isMac) {
+    return {
+      exe: "/Applications/Heroic.app",
+      start_dir: "/Applications",
+      launch_options: fallbackUrl ? `"${fallbackUrl}"` : "--console",
+    };
+  }
+
+  return {
+    exe: "/usr/bin/flatpak",
+    start_dir: "/usr/bin",
+    launch_options: fallbackUrl
+      ? `run com.heroicgameslauncher.hgl "${fallbackUrl}"`
+      : "run com.heroicgameslauncher.hgl --console",
+  };
+}
+
 const LAUNCHER_NAME = "Heroic Games Launcher";
 let launcherId: number | undefined;
 
@@ -164,15 +208,18 @@ export async function openHeroicLauncher(): Promise<void> {
     );
     id = byName?.appid;
   }
+  const params = await resolveShortcutParams();
   if (!id) {
     id = await sc.AddShortcut(
       LAUNCHER_NAME,
-      "/usr/bin/flatpak",
-      "/usr/bin",
-      "run com.heroicgameslauncher.hgl",
+      params.exe,
+      params.start_dir,
+      params.launch_options,
     );
     sc.SetShortcutName(id, LAUNCHER_NAME);
-    sc.SetShortcutLaunchOptions(id, "run com.heroicgameslauncher.hgl");
+    if (params.launch_options) {
+      sc.SetShortcutLaunchOptions(id, params.launch_options);
+    }
     launcherId = id;
     // apply the bundled artwork (hero/logo/grid/wide + icon)
     try {
@@ -185,6 +232,8 @@ export async function openHeroicLauncher(): Promise<void> {
     } catch (e) {
       console.error("launcher artwork failed", e);
     }
+  } else if (params.launch_options) {
+    sc.SetShortcutLaunchOptions(id, params.launch_options);
   }
   Navigation.Navigate(`/library/app/${id}`);
   // close the Quick Access menu so the navigated page is actually visible
@@ -247,14 +296,17 @@ export async function ensureSteamShortcut(game: GameEntry): Promise<number> {
 
   const sc = (window as any).SteamClient.Apps;
   const url = launchUrlFor(game);
+  const params = await resolveShortcutParams(game.store, game.app_name, url);
   const id: number = await sc.AddShortcut(
     game.title,
-    "/usr/bin/flatpak",
-    "/usr/bin",
-    `run com.heroicgameslauncher.hgl "${url}"`,
+    params.exe,
+    params.start_dir,
+    params.launch_options,
   );
   sc.SetShortcutName(id, game.title);
-  sc.SetShortcutLaunchOptions(id, `run com.heroicgameslauncher.hgl "${url}"`);
+  if (params.launch_options) {
+    sc.SetShortcutLaunchOptions(id, params.launch_options);
+  }
   // wait for the UI store to register the new app — first-time navigation
   // otherwise races Steam and lands on a broken page (later ones are fine)
   for (let i = 0; i < 30; i++) {

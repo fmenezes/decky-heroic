@@ -54,7 +54,7 @@ def _parse_node(data: bytes, pos: int) -> tuple[dict[str, Any] | str | int, int]
         return {name: value.decode("utf-8", "replace")}, pos
     if len(data) - pos < 4:
         raise ValueError("truncated int value")
-    value = struct.unpack("<i", data[pos : pos + 4])[0]
+    value = struct.unpack("<I", data[pos : pos + 4])[0]
     return {name: value}, pos + 4
 
 
@@ -84,9 +84,9 @@ def _serialize_dict(obj: dict[str, Any]) -> bytes:
         if isinstance(value, dict):
             out += b"\x00" + n + b"\x00" + _serialize_dict(value) + b"\x08"
         elif isinstance(value, bool):
-            out += b"\x02" + n + b"\x00" + struct.pack("<i", int(value))
+            out += b"\x02" + n + b"\x00" + struct.pack("<I", int(value))
         elif isinstance(value, int):
-            out += b"\x02" + n + b"\x00" + struct.pack("<i", value)
+            out += b"\x02" + n + b"\x00" + struct.pack("<I", value & 0xFFFFFFFF)
         elif isinstance(value, str):
             out += b"\x01" + n + b"\x00" + value.encode() + b"\x00"
         else:
@@ -202,7 +202,7 @@ def synced_markers(doc: dict[str, Any]) -> dict[str, int]:
             exe = str(entry.get("Exe", "")).strip('"')
             name = str(entry.get("AppName", ""))
             appid = shortcut_id(exe, name)
-        out[marker] = int(appid)
+        out[marker] = int(appid) & 0xFFFFFFFF
     return out
 
 

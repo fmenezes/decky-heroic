@@ -25,6 +25,16 @@ from heroic_library import (
     is_store_logged_in,
     launch_url,
 )
+from platform_utils import (
+    get_heroic_config_candidates,
+    get_heroic_launch_command,
+    get_steam_shortcut_params,
+    get_steam_userdata_candidates,
+    is_heroic_installed,
+    is_linux,
+    is_macos,
+    is_windows,
+)
 from steam_shortcuts import (
     build_shortcut,
     is_ours,
@@ -114,21 +124,7 @@ def _is_flatpak_available() -> bool:
 
 
 def _is_heroic_installed() -> bool:
-    flatpak = shutil.which("flatpak") or "/usr/bin/flatpak"
-    if shutil.which(flatpak) or (Path(flatpak).exists() and os.access(flatpak, os.X_OK)):
-        try:
-            res = subprocess.run(
-                [flatpak, "info", FLATPAK_ID],
-                capture_output=True,
-                timeout=5,
-            )
-            if res.returncode == 0:
-                return True
-        except Exception:
-            pass
-    if shutil.which("heroic") is not None:
-        return True
-    return False
+    return is_heroic_installed()
 
 
 # Artwork for the "Heroic Games Launcher" shortcut, from SteamGridDB.
@@ -143,20 +139,14 @@ LAUNCHER_ART_URLS = {
 
 class Plugin:
     def _resolve_heroic_config(self) -> tuple[Path | None, list[str]]:
-        """Resolve the Heroic config dir.
+        """Resolve the Heroic config dir using OS-specific probe paths.
 
         Order: HEROIC_CONFIG_DIR env var (dev/testing), then the standard
-        flatpak and native install directories. Returns
+        flatpak, native, or macOS/Windows install directories. Returns
         (config_dir_or_None, probed_paths).
         """
         home = Path(os.environ.get("DECKY_USER_HOME") or Path.home())
-        candidates = [
-            home / ".var" / "app" / FLATPAK_ID / "config" / "heroic",
-            home / ".config" / "heroic",
-        ]
-        env_override = os.environ.get("HEROIC_CONFIG_DIR")
-        if env_override:
-            candidates.insert(0, Path(env_override).expanduser())
+        candidates = get_heroic_config_candidates(home)
         probed = [str(p) for p in candidates]
         config = find_heroic_config(candidates)
         if config is None:
@@ -170,34 +160,16 @@ class Plugin:
         """Classify the Heroic install from its config location."""
         if config is None:
             return None
+        if is_macos():
+            return "macos"
+        if is_windows():
+            return "windows"
         return "flatpak" if ".var/app" in str(config) else "native"
 
     def _launch_command(self, url: str) -> list[str]:
-        """Build the command to send a heroic:// URL to Heroic, based on how
-        Heroic is installed:
-
-        - flatpak: `flatpak run com.heroicgameslauncher.hgl <url>`
-        - native: `<heroic binary> <url>` (from PATH)
-        - fallback: `xdg-open <url>` (works when a desktop environment exists)
-
-        Heroic's protocol handler reads heroic:// URLs from its CLI args, so
-        invoking the app directly works without xdg-open (which fails in
-        Game Mode, where no desktop environment exists).
-        """
+        """Build the command to send a heroic:// URL to Heroic based on OS."""
         config, _ = self._resolve_heroic_config()
-        kind = self._heroic_install_kind(config)
-        if kind == "flatpak":
-            flatpak = shutil.which("flatpak") or "/usr/bin/flatpak"
-            return [flatpak, "run", FLATPAK_ID, url]
-        heroic = shutil.which("heroic")
-        if heroic is not None:
-            return [heroic, url]
-        xdg = shutil.which("xdg-open")
-        if xdg is not None:
-            return [xdg, url]
-        raise RuntimeError(
-            "No way to launch Heroic found (flatpak/heroic/xdg-open)"
-        )
+        return get_heroic_launch_command(url, config)
 
     def _launch_env(self) -> dict:
         """Environment for the launch command: GUI apps need a display, but
@@ -221,6 +193,7 @@ class Plugin:
             "found": config is not None and (config / "store_cache").is_dir(),
             "installed": installed,
             "has_flatpak": _is_flatpak_available(),
+            "platform": "macos" if is_macos() else ("windows" if is_windows() else "linux"),
             "stores": stores,
             "probed": probed,
             "warnings": warnings,
@@ -377,6 +350,7 @@ class Plugin:
         result["config"] = str(config)
         result["heroic_found"] = True
         result["installed"] = installed
+        result["platform"] = "macos" if is_macos() else ("windows" if is_windows() else "linux")
         result["stores"] = stores
         result["probed"] = probed
         if result["errors"]:
@@ -433,14 +407,8 @@ class Plugin:
         Returns (userdata_dir, user_config_dir); both None when Steam's data
         cannot be found.
         """
-        home = Path.home()
-        candidates = [
-            home / ".local/share/Steam/userdata",
-            home / ".steam/steam/userdata",
-            home / ".steam/debian-installation/userdata",
-            home
-            / ".var/app/com.valvesoftware.Steam/.local/share/Steam/userdata",
-        ]
+        home = Path(os.environ.get("DECKY_USER_HOME") or Path.home())
+        candidates = get_steam_userdata_candidates(home)
         userdata = next((p for p in candidates if p.is_dir()), None)
         if userdata is None:
             return None, None
@@ -464,15 +432,13 @@ class Plugin:
         Steam computes one at load); cover files are named after it."""
         url = launch_url(game["app_name"], game["runner"])
         marker = f"heroic:{game['store']}:{game['app_name']}"
-        # Exe/LaunchOptions reuse the same defensive install-kind detection
-        # as in-game launches (flatpak vs native heroic)
-        cmd = self._launch_command(url)
-        exe, launch_prefix = cmd[0], cmd[1:-1]
+        config, _ = self._resolve_heroic_config()
+        exe, start_dir, launch_options = get_steam_shortcut_params(url, config)
         entry = build_shortcut(
             title=game["title"],
             exe=exe,
-            launch_options=" ".join([*launch_prefix, f'"{url}"']).strip(),
-            start_dir=str(Path(exe).parent),
+            launch_options=launch_options,
+            start_dir=start_dir,
             marker=marker,
             appid=appid,
         )
@@ -558,6 +524,47 @@ class Plugin:
         if itype is None:
             raise ValueError(f"unsupported image format: {url}")
         return data, itype
+
+    async def get_shortcut_params(
+        self, store: str = "", app_name: str = ""
+    ) -> dict:
+        """Return platform-specific shortcut parameters (exe, start_dir, launch_options)
+        for a given game or for the Heroic launcher itself (when store/app_name are empty)."""
+        return await asyncio.to_thread(
+            self._get_shortcut_params_blocking, store, app_name
+        )
+
+    def _get_shortcut_params_blocking(self, store: str, app_name: str) -> dict:
+        config, _ = self._resolve_heroic_config()
+        if store and app_name:
+            library = get_library(config) if config else {"games": []}
+            game = next(
+                (
+                    g
+                    for g in library.get("games", [])
+                    if g["store"] == store and g["app_name"] == app_name
+                ),
+                None,
+            )
+            runner = (
+                game["runner"]
+                if game
+                else (
+                    "gog"
+                    if store == "gog"
+                    else ("legendary" if store == "epic" else "nile")
+                )
+            )
+            url = launch_url(app_name, runner)
+        else:
+            url = ""
+        exe, start_dir, launch_options = get_steam_shortcut_params(url, config)
+        return {
+            "exe": exe,
+            "start_dir": start_dir,
+            "launch_options": launch_options,
+            "url": url,
+        }
 
     async def add_shortcut(
         self, store: str, app_name: str, steam_appid: int | None = None
