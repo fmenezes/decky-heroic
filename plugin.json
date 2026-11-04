@@ -1,10 +1,17 @@
 {
   "name": "Heroic Library",
   "author": "Filipe Constantinov Menezes",
-  "flags": ["debug"],
+  "flags": [],
   "api_version": 1,
   "publish": {
-    "tags": ["heroic", "games", "library", "gog", "epic"],
-    "description": "Browse and launch your Heroic Games Launcher library (GOG + Epic) from the Quick Access menu."
+    "tags": [
+      "heroic",
+      "games",
+      "library",
+      "gog",
+      "epic"
+    ],
+    "description": "Browse and launch your Heroic Games Launcher library (GOG + Epic) from the Quick Access menu.",
+    "image": "https://raw.githubusercontent.com/fmenezes/decky-heroic/main/.github/assets/library-epic.jpg"
   }
 }
